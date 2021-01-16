@@ -2021,7 +2021,12 @@ int main(void) {
     .frameCount = 0,
   };
 
-  initializeScene(scene, "res/cube_scene.obj");
+  // initializeScene(scene, "res/cube_scene.obj");
+  // initializeScene(scene, "../ray_pipeline/res/cube_scene_pile.obj");
+  // initializeScene(scene, "res/cube_scene_large_pile.obj");
+  initializeScene(scene, "res/cube_scene_larger_pile.obj");
+  // initializeScene(scene, "res/barrel.obj");
+
 
   initializeVulkanContext(app);
   pickPhysicalDevice(app);

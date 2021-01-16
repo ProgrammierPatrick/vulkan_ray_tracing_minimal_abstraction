@@ -155,6 +155,21 @@ void readFile(const char* fileName, char** buffer, uint64_t* length) {
   *length = readSize;
 }
 
+VkResult check(const char* funcName, VkResult result) {
+  if(result != VK_SUCCESS) {
+    const char* error = "unknown error";
+    if(result == VK_ERROR_DEVICE_LOST) error = "VK_ERROR_DEVICE_LOST";
+    else if(result == VK_ERROR_OUT_OF_HOST_MEMORY) error = "VK_ERROR_OUT_OF_HOST_MEMORY";
+    else if(result == VK_ERROR_OUT_OF_DEVICE_MEMORY) error = "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+    else if(result == VK_ERROR_INITIALIZATION_FAILED) error = "VK_ERROR_INITIALIZATION_FAILED";
+    else if(result == VK_ERROR_EXTENSION_NOT_PRESENT) error = "VK_ERROR_EXTENSION_NOT_PRESENT";
+    else if(result == VK_ERROR_FEATURE_NOT_PRESENT) error = "VK_ERROR_FEATURE_NOT_PRESENT";
+    else if(result == VK_ERROR_TOO_MANY_OBJECTS) error = "VK_ERROR_TOO_MANY_OBJECTS";
+    printf("\033[91m=============\nVulkan function %s() failed: %s\n=============\033[0m\n", funcName, error);
+  }
+  return result;
+}
+
 void createBuffer(struct VulkanApplication* app, VkDeviceSize size, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags propertyFlags, VkBuffer* buffer, VkDeviceMemory* bufferMemory) {
   VkBufferCreateInfo bufferCreateInfo = {};
   bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -162,7 +177,7 @@ void createBuffer(struct VulkanApplication* app, VkDeviceSize size, VkBufferUsag
   bufferCreateInfo.usage = usageFlags;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  if (vkCreateBuffer(app->logicalDevice, &bufferCreateInfo, NULL, buffer) == VK_SUCCESS) {
+  if (check("vkCreateBuffer",vkCreateBuffer(app->logicalDevice, &bufferCreateInfo, NULL, buffer)) == VK_SUCCESS) {
     printf("created buffer with size %ld\n", size);
   }
 
@@ -182,11 +197,11 @@ void createBuffer(struct VulkanApplication* app, VkDeviceSize size, VkBufferUsag
   }
   memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
 
-  if (vkAllocateMemory(app->logicalDevice, &memoryAllocateInfo, NULL, bufferMemory) == VK_SUCCESS) {
+  if (check("vkAllocateMemory", vkAllocateMemory(app->logicalDevice, &memoryAllocateInfo, NULL, bufferMemory)) == VK_SUCCESS) {
     printf("allocated buffer memory\n");
   }
 
-  vkBindBufferMemory(app->logicalDevice, *buffer, *bufferMemory, 0);
+  check("vkBindBufferMemory", vkBindBufferMemory(app->logicalDevice, *buffer, *bufferMemory, 0));
 }
 
 void copyBuffer(struct VulkanApplication* app, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
@@ -197,25 +212,25 @@ void copyBuffer(struct VulkanApplication* app, VkBuffer srcBuffer, VkBuffer dstB
   bufferAllocateInfo.commandBufferCount = 1;
 
   VkCommandBuffer commandBuffer;
-  vkAllocateCommandBuffers(app->logicalDevice, &bufferAllocateInfo, &commandBuffer);
+  check("vkAllocateCommandBuffer", vkAllocateCommandBuffers(app->logicalDevice, &bufferAllocateInfo, &commandBuffer));
   
   VkCommandBufferBeginInfo commandBufferBeginInfo = {};
   commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   
-  vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+  check("vkBeginCommandBuffer", vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
   VkBufferCopy bufferCopy = {};
   bufferCopy.size = size;
   vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &bufferCopy);
-  vkEndCommandBuffer(commandBuffer);
+  check("vkEndCommandBuffer", vkEndCommandBuffer(commandBuffer));
 
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &commandBuffer;
 
-  vkQueueSubmit(app->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(app->graphicsQueue);
+  check("vkQueueSubmit", vkQueueSubmit(app->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
+  check("copyBuffer:vkQueueWaitIdle", vkQueueWaitIdle(app->graphicsQueue));
 
   vkFreeCommandBuffers(app->logicalDevice, app->commandPool, 1, &commandBuffer);
 }
@@ -315,12 +330,12 @@ void initializeVulkanContext(struct VulkanApplication* app) {
     instanceCreateInfo.enabledLayerCount = layerCount;
     instanceCreateInfo.ppEnabledLayerNames = layerNames;
 
-    if (vkCreateInstance(&instanceCreateInfo, NULL, &app->instance) == VK_SUCCESS) {
+    if (check("vkCreateInstance", vkCreateInstance(&instanceCreateInfo, NULL, &app->instance)) == VK_SUCCESS) {
       printf("created Vulkan instance\n");
     }
 
     PFN_vkCreateDebugUtilsMessengerEXT pvkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(app->instance, "vkCreateDebugUtilsMessengerEXT");
-    if (pvkCreateDebugUtilsMessengerEXT(app->instance, &messengerCreateInfo, NULL, &app->debugMessenger) == VK_SUCCESS) {
+    if (check("vkCreateDebugUtilsMessengerExt",pvkCreateDebugUtilsMessengerEXT(app->instance, &messengerCreateInfo, NULL, &app->debugMessenger)) == VK_SUCCESS) {
       printf("created debug messenger\n");
     }
 
@@ -330,7 +345,7 @@ void initializeVulkanContext(struct VulkanApplication* app) {
     instanceCreateInfo.enabledLayerCount = 0;
     instanceCreateInfo.pNext = NULL;
 
-    if (vkCreateInstance(&instanceCreateInfo, NULL, &app->instance) == VK_SUCCESS) {
+    if (check("vkCreateInstance", vkCreateInstance(&instanceCreateInfo, NULL, &app->instance)) == VK_SUCCESS) {
       printf("created Vulkan instance\n");
     }
   }
@@ -345,9 +360,9 @@ void initializeVulkanContext(struct VulkanApplication* app) {
 void pickPhysicalDevice(struct VulkanApplication* app) {
   app->physicalDevice = VK_NULL_HANDLE;
   uint32_t deviceCount = 0;
-  vkEnumeratePhysicalDevices(app->instance, &deviceCount, NULL);
+  check("vkEnumeratePhysicalDevices", vkEnumeratePhysicalDevices(app->instance, &deviceCount, NULL));
   VkPhysicalDevice* devices = (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * deviceCount);
-  vkEnumeratePhysicalDevices(app->instance, &deviceCount, devices);
+  check("vkEnumeratePhysicalDevices", vkEnumeratePhysicalDevices(app->instance, &deviceCount, devices));
   app->physicalDevice = devices[0];
 
   if (app->physicalDevice != VK_NULL_HANDLE) {
@@ -379,7 +394,7 @@ void createLogicalConnection(struct VulkanApplication* app) {
     }
 
     VkBool32 isPresentSupported = 0;
-    vkGetPhysicalDeviceSurfaceSupportKHR(app->physicalDevice, x, app->surface, &isPresentSupported);
+    check("vkGetPhysicalDeviceSurfaceSupportKHR", vkGetPhysicalDeviceSurfaceSupportKHR(app->physicalDevice, x, app->surface, &isPresentSupported));
     
     if (app->presentQueueIndex == -1 && isPresentSupported) {
       app->presentQueueIndex = x;
@@ -465,7 +480,7 @@ void createLogicalConnection(struct VulkanApplication* app) {
   deviceCreateInfo.ppEnabledExtensionNames = deviceEnabledExtensionNames;
   deviceCreateInfo.pEnabledFeatures = NULL;
 
-  if (vkCreateDevice(app->physicalDevice, &deviceCreateInfo, NULL, &app->logicalDevice) == VK_SUCCESS) {
+  if (check("vkCreateDevice", vkCreateDevice(app->physicalDevice, &deviceCreateInfo, NULL, &app->logicalDevice)) == VK_SUCCESS) {
     printf("created logical connection to device\n");
   }
 
@@ -480,17 +495,17 @@ void createLogicalConnection(struct VulkanApplication* app) {
 
 void createSwapchain(struct VulkanApplication* app) {
   VkSurfaceCapabilitiesKHR surfaceCapabilities;
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(app->physicalDevice, app->surface, &surfaceCapabilities);
+  check("vkGetPhysicalDeviceSurfaceCapabilitiesKHR", vkGetPhysicalDeviceSurfaceCapabilitiesKHR(app->physicalDevice, app->surface, &surfaceCapabilities));
   
   uint32_t formatCount = 0;
-  vkGetPhysicalDeviceSurfaceFormatsKHR(app->physicalDevice, app->surface, &formatCount, NULL);
+  check("vkGetPhysicalDeviceSurfaceFormatsKHR", vkGetPhysicalDeviceSurfaceFormatsKHR(app->physicalDevice, app->surface, &formatCount, NULL));
   VkSurfaceFormatKHR* surfaceFormats = (VkSurfaceFormatKHR*)malloc(sizeof(VkSurfaceFormatKHR) * formatCount);
-  vkGetPhysicalDeviceSurfaceFormatsKHR(app->physicalDevice, app->surface, &formatCount, surfaceFormats);
+  check("vkGetPhysicalDeviceSurfaceFormatsKHR", vkGetPhysicalDeviceSurfaceFormatsKHR(app->physicalDevice, app->surface, &formatCount, surfaceFormats));
 
   uint32_t presentModeCount = 0;
-  vkGetPhysicalDeviceSurfacePresentModesKHR(app->physicalDevice, app->surface, &presentModeCount, NULL);
+  check("vkGetPhysicalDeviceSurfacePresentModesKHR", vkGetPhysicalDeviceSurfacePresentModesKHR(app->physicalDevice, app->surface, &presentModeCount, NULL));
   VkPresentModeKHR* surfacePresentModes = (VkPresentModeKHR*)malloc(sizeof(VkPresentModeKHR) * presentModeCount);
-  vkGetPhysicalDeviceSurfacePresentModesKHR(app->physicalDevice, app->surface, &presentModeCount, surfacePresentModes);
+  check("vkGetPhysicalDeviceSurfacePresentModesKHR", vkGetPhysicalDeviceSurfacePresentModesKHR(app->physicalDevice, app->surface, &presentModeCount, surfacePresentModes));
 
   VkSurfaceFormatKHR surfaceFormat = surfaceFormats[0];
   VkPresentModeKHR presentMode = surfacePresentModes[0];
@@ -528,13 +543,13 @@ void createSwapchain(struct VulkanApplication* app) {
   swapchainCreateInfo.clipped = VK_TRUE;
   swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
-  if (vkCreateSwapchainKHR(app->logicalDevice, &swapchainCreateInfo, NULL, &app->swapchain) == VK_SUCCESS) {
+  if (check("vkCreateSwapchainKHR", vkCreateSwapchainKHR(app->logicalDevice, &swapchainCreateInfo, NULL, &app->swapchain)) == VK_SUCCESS) {
     printf("created swapchain\n");
   }
 
-  vkGetSwapchainImagesKHR(app->logicalDevice, app->swapchain, &app->imageCount, NULL);
+  check("vkGetSwapchainImagesKHR", vkGetSwapchainImagesKHR(app->logicalDevice, app->swapchain, &app->imageCount, NULL));
   app->swapchainImages = (VkImage*)malloc(sizeof(VkImage) * app->imageCount);
-  vkGetSwapchainImagesKHR(app->logicalDevice, app->swapchain, &app->imageCount, app->swapchainImages);
+  check("vkGetSwapchainImagesKHR", vkGetSwapchainImagesKHR(app->logicalDevice, app->swapchain, &app->imageCount, app->swapchainImages));
 
   app->swapchainImageFormat = surfaceFormat.format;
 
@@ -547,20 +562,24 @@ void createCommandPool(struct VulkanApplication* app) {
   commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   commandPoolCreateInfo.queueFamilyIndex = app->graphicsQueueIndex;
 
-  if (vkCreateCommandPool(app->logicalDevice, &commandPoolCreateInfo, NULL, &app->commandPool) == VK_SUCCESS) {
+  if (check("vkCreateCommandPool", vkCreateCommandPool(app->logicalDevice, &commandPoolCreateInfo, NULL, &app->commandPool)) == VK_SUCCESS) {
     printf("created command pool\n");
   }
 }
 
 void createVertexBuffer(struct VulkanApplication* app, struct Scene* scene) {
+
   VkDeviceSize positionBufferSize = sizeof(float) * scene->attributes.num_vertices * 3;
   
+  printf("createVertexBuffer(): \n");
+  printf("  scene->attributes.numVertices: %d\n  positionBufferSize: %d\n", scene->attributes.num_vertices, positionBufferSize);
+
   VkBuffer positionStagingBuffer;
   VkDeviceMemory positionStagingBufferMemory;
   createBuffer(app, positionBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &positionStagingBuffer, &positionStagingBufferMemory);
 
   void* positionData;
-  vkMapMemory(app->logicalDevice, positionStagingBufferMemory, 0, positionBufferSize, 0, &positionData);
+  check("vkMapMemory", vkMapMemory(app->logicalDevice, positionStagingBufferMemory, 0, positionBufferSize, 0, &positionData));
   memcpy(positionData, scene->attributes.vertices, positionBufferSize);
   vkUnmapMemory(app->logicalDevice, positionStagingBufferMemory);
 
@@ -579,13 +598,16 @@ void createIndexBuffer(struct VulkanApplication* app, struct Scene* scene) {
   for (int x = 0; x < scene->attributes.num_faces; x++) {
     positionIndices[x] = scene->attributes.faces[x].v_idx;
   }
-  
+
+  printf("createIndexBuffer(): \n");
+  printf("  scene->attributes.num_faces: %d\n  bufferSize: %d\n", scene->attributes.num_faces, bufferSize);
+
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
   createBuffer(app, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, &stagingBufferMemory);
 
   void* data;
-  vkMapMemory(app->logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+  check("vkMapMemory", vkMapMemory(app->logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data));
   memcpy(data, positionIndices, bufferSize);
   vkUnmapMemory(app->logicalDevice, stagingBufferMemory);
 
@@ -607,7 +629,7 @@ void createMaterialsBuffer(struct VulkanApplication* app, struct Scene* scene) {
   createBuffer(app, indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &indexStagingBuffer, &indexStagingBufferMemory);
 
   void* indexData;
-  vkMapMemory(app->logicalDevice, indexStagingBufferMemory, 0, indexBufferSize, 0, &indexData);
+  check("vkMapMemory", vkMapMemory(app->logicalDevice, indexStagingBufferMemory, 0, indexBufferSize, 0, &indexData));
   memcpy(indexData, scene->attributes.material_ids, indexBufferSize);
   vkUnmapMemory(app->logicalDevice, indexStagingBufferMemory);
 
@@ -633,7 +655,7 @@ void createMaterialsBuffer(struct VulkanApplication* app, struct Scene* scene) {
   createBuffer(app, materialBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &materialStagingBuffer, &materialStagingBufferMemory);
 
   void* materialData;
-  vkMapMemory(app->logicalDevice, materialStagingBufferMemory, 0, materialBufferSize, 0, &materialData);
+  check("vkMapMemory", vkMapMemory(app->logicalDevice, materialStagingBufferMemory, 0, materialBufferSize, 0, &materialData));
   memcpy(materialData, materials, materialBufferSize);
   vkUnmapMemory(app->logicalDevice, materialStagingBufferMemory);
 
@@ -665,7 +687,7 @@ void createTextures(struct VulkanApplication* app) {
   imageViewCreateInfo.subresourceRange = subresourceRange;
   imageViewCreateInfo.image = app->rayTraceImage;
 
-  if (vkCreateImageView(app->logicalDevice, &imageViewCreateInfo, NULL, &app->rayTraceImageView) == VK_SUCCESS) {
+  if (check("vkCreateImageView", vkCreateImageView(app->logicalDevice, &imageViewCreateInfo, NULL, &app->rayTraceImageView)) == VK_SUCCESS) {
     printf("created image view\n");
   }
 
@@ -686,23 +708,23 @@ void createTextures(struct VulkanApplication* app) {
   bufferAllocateInfo.commandBufferCount = 1;
 
   VkCommandBuffer commandBuffer;
-  vkAllocateCommandBuffers(app->logicalDevice, &bufferAllocateInfo, &commandBuffer);
+  check("vkAllocateCommandBuffers", vkAllocateCommandBuffers(app->logicalDevice, &bufferAllocateInfo, &commandBuffer));
   
   VkCommandBufferBeginInfo commandBufferBeginInfo = {};
   commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   
-  vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+  check("vkBeginCommandBuffer", vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
   vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
-  vkEndCommandBuffer(commandBuffer);
+  check("vkEndCommandBuffer", vkEndCommandBuffer(commandBuffer));
 
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &commandBuffer;
 
-  vkQueueSubmit(app->computeQueue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(app->computeQueue);
+  check("vkQueueSubmit", vkQueueSubmit(app->computeQueue, 1, &submitInfo, VK_NULL_HANDLE));
+  check("vkQueueWaitIdle", vkQueueWaitIdle(app->computeQueue));
 
   vkFreeCommandBuffers(app->logicalDevice, app->commandPool, 1, &commandBuffer);
 }
@@ -731,6 +753,8 @@ void createBottomLevelAccelerationStructure(struct VulkanApplication* app, struc
   VkDeviceOrHostAddressConstKHR indexDeviceOrHostAddressConst = {};
   indexDeviceOrHostAddressConst.deviceAddress = indexBufferAddress;
 
+  printf("createBottomLevelAccelerationStructure()\n");
+
   VkAccelerationStructureGeometryTrianglesDataKHR accelerationStructureGeometryTrianglesData = {
     .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
     .pNext = NULL,
@@ -742,6 +766,7 @@ void createBottomLevelAccelerationStructure(struct VulkanApplication* app, struc
     .indexData = indexDeviceOrHostAddressConst,
     .transformData = (VkDeviceOrHostAddressConstKHR){}
   };
+  printf("  triangles.maxVertex = %d\n", scene->attributes.num_vertices);
 
   VkAccelerationStructureGeometryDataKHR accelerationStructureGeometryData = {
     .triangles = accelerationStructureGeometryTrianglesData
@@ -817,7 +842,7 @@ void createBottomLevelAccelerationStructure(struct VulkanApplication* app, struc
     .deviceAddress = VK_NULL_HANDLE
   };
 
-  pvkCreateAccelerationStructureKHR(app->logicalDevice, &accelerationStructureCreateInfo, NULL, &app->bottomLevelAccelerationStructure);
+  check("pvkCreateAccelerationStructureKHR", pvkCreateAccelerationStructureKHR(app->logicalDevice, &accelerationStructureCreateInfo, NULL, &app->bottomLevelAccelerationStructure));
 
   accelerationStructureBuildGeometryInfo.dstAccelerationStructure = app->bottomLevelAccelerationStructure;
 
@@ -827,6 +852,7 @@ void createBottomLevelAccelerationStructure(struct VulkanApplication* app, struc
     .firstVertex = 0,
     .transformOffset = 0
   };
+  printf("  rangeInfo.primitiveCount = %d\n", scene->attributes.num_face_num_verts);
   const VkAccelerationStructureBuildRangeInfoKHR** accelerationStructureBuildRangeInfos = &accelerationStructureBuildRangeInfo;
 
   VkCommandBufferAllocateInfo bufferAllocateInfo = {};
@@ -836,23 +862,23 @@ void createBottomLevelAccelerationStructure(struct VulkanApplication* app, struc
   bufferAllocateInfo.commandBufferCount = 1;
 
   VkCommandBuffer commandBuffer;
-  vkAllocateCommandBuffers(app->logicalDevice, &bufferAllocateInfo, &commandBuffer);
+  check("vkAllocateCommandBuffers", vkAllocateCommandBuffers(app->logicalDevice, &bufferAllocateInfo, &commandBuffer));
   
   VkCommandBufferBeginInfo commandBufferBeginInfo = {};
   commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   
-  vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+  check("vkBeginCommandBuffer", vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
   pvkCmdBuildAccelerationStructuresKHR(commandBuffer, 1, &accelerationStructureBuildGeometryInfo, accelerationStructureBuildRangeInfos);
-  vkEndCommandBuffer(commandBuffer);
+  check("vkEndCommandBuffer", vkEndCommandBuffer(commandBuffer));
 
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &commandBuffer;
 
-  vkQueueSubmit(app->computeQueue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(app->computeQueue);
+  check("vkQueueSubmit", vkQueueSubmit(app->computeQueue, 1, &submitInfo, VK_NULL_HANDLE));
+  check("createBLAS:vkQueueWaitIdle", vkQueueWaitIdle(app->computeQueue));
 
   vkFreeCommandBuffers(app->logicalDevice, app->commandPool, 1, &commandBuffer);
 
@@ -893,7 +919,7 @@ void createTopLevelAccelerationStructure(struct VulkanApplication* app) {
   createBuffer(app, geometryInstanceBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &geometryInstanceStagingBuffer, &geometryInstanceStagingBufferMemory);
 
   void* geometryInstanceData;
-  vkMapMemory(app->logicalDevice, geometryInstanceStagingBufferMemory, 0, geometryInstanceBufferSize, 0, &geometryInstanceData);
+  check("vkMapMemory", vkMapMemory(app->logicalDevice, geometryInstanceStagingBufferMemory, 0, geometryInstanceBufferSize, 0, &geometryInstanceData));
   memcpy(geometryInstanceData, &geometryInstance, geometryInstanceBufferSize);
   vkUnmapMemory(app->logicalDevice, geometryInstanceStagingBufferMemory);
 
@@ -997,7 +1023,7 @@ void createTopLevelAccelerationStructure(struct VulkanApplication* app) {
     .deviceAddress = VK_NULL_HANDLE
   };
 
-  pvkCreateAccelerationStructureKHR(app->logicalDevice, &accelerationStructureCreateInfo, NULL, &app->topLevelAccelerationStructure);
+  check("pvkCreateAccelerationStructureKHR", pvkCreateAccelerationStructureKHR(app->logicalDevice, &accelerationStructureCreateInfo, NULL, &app->topLevelAccelerationStructure));
 
   accelerationStructureBuildGeometryInfo.dstAccelerationStructure = app->topLevelAccelerationStructure;
 
@@ -1016,23 +1042,23 @@ void createTopLevelAccelerationStructure(struct VulkanApplication* app) {
   bufferAllocateInfo.commandBufferCount = 1;
 
   VkCommandBuffer commandBuffer;
-  vkAllocateCommandBuffers(app->logicalDevice, &bufferAllocateInfo, &commandBuffer);
+  check("vkAllocateCommandBuffers", vkAllocateCommandBuffers(app->logicalDevice, &bufferAllocateInfo, &commandBuffer));
   
   VkCommandBufferBeginInfo commandBufferBeginInfo = {};
   commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   
-  vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+  check("vkBeginCommandBuffer", vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
   pvkCmdBuildAccelerationStructuresKHR(commandBuffer, 1, &accelerationStructureBuildGeometryInfo, accelerationStructureBuildRangeInfos);
-  vkEndCommandBuffer(commandBuffer);
+  check("vkEndCommandBuffer", vkEndCommandBuffer(commandBuffer));
 
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &commandBuffer;
 
-  vkQueueSubmit(app->computeQueue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(app->computeQueue);
+  check("vkQueueSubmit", vkQueueSubmit(app->computeQueue, 1, &submitInfo, VK_NULL_HANDLE));
+  check("vkQueueWaitIdle", vkQueueWaitIdle(app->computeQueue));
 
   vkFreeCommandBuffers(app->logicalDevice, app->commandPool, 1, &commandBuffer);
 
@@ -1067,7 +1093,7 @@ void createDescriptorSets(struct VulkanApplication* app) {
   descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes;
   descriptorPoolCreateInfo.maxSets = 2;
 
-  if (vkCreateDescriptorPool(app->logicalDevice, &descriptorPoolCreateInfo, NULL, &app->descriptorPool) == VK_SUCCESS) {
+  if (check("vkCreateDescriptorPool", vkCreateDescriptorPool(app->logicalDevice, &descriptorPoolCreateInfo, NULL, &app->descriptorPool)) == VK_SUCCESS) {
     printf("\033[22;32m%s\033[0m\n", "created descriptor pool");
   }
 
@@ -1108,7 +1134,7 @@ void createDescriptorSets(struct VulkanApplication* app) {
     descriptorSetLayoutCreateInfo.bindingCount = 5;
     descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings;
     
-    if (vkCreateDescriptorSetLayout(app->logicalDevice, &descriptorSetLayoutCreateInfo, NULL, &app->rayTraceDescriptorSetLayouts[0]) == VK_SUCCESS) {
+    if (check("vkCreateDescriptorLayout", vkCreateDescriptorSetLayout(app->logicalDevice, &descriptorSetLayoutCreateInfo, NULL, &app->rayTraceDescriptorSetLayouts[0])) == VK_SUCCESS) {
       printf("\033[22;32m%s\033[0m\n", "created descriptor set layout");
     }
 
@@ -1118,7 +1144,7 @@ void createDescriptorSets(struct VulkanApplication* app) {
     descriptorSetAllocateInfo.descriptorSetCount = 1;
     descriptorSetAllocateInfo.pSetLayouts = &app->rayTraceDescriptorSetLayouts[0];
 
-    if (vkAllocateDescriptorSets(app->logicalDevice, &descriptorSetAllocateInfo, &app->rayTraceDescriptorSet) == VK_SUCCESS) {
+    if (check("vkAllocateDescriptorSets", vkAllocateDescriptorSets(app->logicalDevice, &descriptorSetAllocateInfo, &app->rayTraceDescriptorSet)) == VK_SUCCESS) {
       printf("\033[22;32m%s\033[0m\n", "allocated descriptor sets");
     }
 
@@ -1227,7 +1253,7 @@ void createDescriptorSets(struct VulkanApplication* app) {
     descriptorSetLayoutCreateInfo.bindingCount = 2;
     descriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings;
     
-    if (vkCreateDescriptorSetLayout(app->logicalDevice, &descriptorSetLayoutCreateInfo, NULL, &app->rayTraceDescriptorSetLayouts[1]) == VK_SUCCESS) {
+    if (check("vkCreateDescriptorSetLayout", vkCreateDescriptorSetLayout(app->logicalDevice, &descriptorSetLayoutCreateInfo, NULL, &app->rayTraceDescriptorSetLayouts[1])) == VK_SUCCESS) {
       printf("\033[22;32m%s\033[0m\n", "created descriptor set layout");
     }
 
@@ -1237,7 +1263,7 @@ void createDescriptorSets(struct VulkanApplication* app) {
     descriptorSetAllocateInfo.descriptorSetCount = 1;
     descriptorSetAllocateInfo.pSetLayouts = &app->rayTraceDescriptorSetLayouts[1];
 
-    if (vkAllocateDescriptorSets(app->logicalDevice, &descriptorSetAllocateInfo, &app->materialDescriptorSet) == VK_SUCCESS) {
+    if (check("vkAllocateDescriptorSets", vkAllocateDescriptorSets(app->logicalDevice, &descriptorSetAllocateInfo, &app->materialDescriptorSet)) == VK_SUCCESS) {
       printf("\033[22;32m%s\033[0m\n", "allocated descriptor sets");
     }
 
@@ -1324,7 +1350,7 @@ void createRayTracePipeline(struct VulkanApplication* app) {
   rgenShaderModuleCreateInfo.pCode = (uint32_t*)rgenFileBuffer;
   
   VkShaderModule rgenShaderModule;
-  if (vkCreateShaderModule(app->logicalDevice, &rgenShaderModuleCreateInfo, NULL, &rgenShaderModule) == VK_SUCCESS) {
+  if (check("vkCreateShaderModule", vkCreateShaderModule(app->logicalDevice, &rgenShaderModuleCreateInfo, NULL, &rgenShaderModule)) == VK_SUCCESS) {
     printf("\033[22;32m%s\033[0m\n", "created rgen shader module");
   }
 
@@ -1334,7 +1360,7 @@ void createRayTracePipeline(struct VulkanApplication* app) {
   rmissShaderModuleCreateInfo.pCode = (uint32_t*)rmissFileBuffer;
 
   VkShaderModule rmissShaderModule;
-  if (vkCreateShaderModule(app->logicalDevice, &rmissShaderModuleCreateInfo, NULL, &rmissShaderModule) == VK_SUCCESS) {
+  if (check("vkCreateShaderModule", vkCreateShaderModule(app->logicalDevice, &rmissShaderModuleCreateInfo, NULL, &rmissShaderModule)) == VK_SUCCESS) {
     printf("\033[22;32m%s\033[0m\n", "created rmiss shader module");
   }
 
@@ -1344,7 +1370,7 @@ void createRayTracePipeline(struct VulkanApplication* app) {
   rmissShadowShaderModuleCreateInfo.pCode = (uint32_t*)rmissShadowFileBuffer;
 
   VkShaderModule rmissShadowShaderModule;
-  if (vkCreateShaderModule(app->logicalDevice, &rmissShadowShaderModuleCreateInfo, NULL, &rmissShadowShaderModule) == VK_SUCCESS) {
+  if (check("vkCreateShaderModule", vkCreateShaderModule(app->logicalDevice, &rmissShadowShaderModuleCreateInfo, NULL, &rmissShadowShaderModule)) == VK_SUCCESS) {
     printf("\033[22;32m%s\033[0m\n", "created rmiss shadow shader module");
   }
 
@@ -1354,7 +1380,7 @@ void createRayTracePipeline(struct VulkanApplication* app) {
   rchitShaderModuleCreateInfo.pCode = (uint32_t*)rchitFileBuffer;
 
   VkShaderModule rchitShaderModule;
-  if (vkCreateShaderModule(app->logicalDevice, &rchitShaderModuleCreateInfo, NULL, &rchitShaderModule) == VK_SUCCESS) {
+  if (check("vkCreateShaderModule", vkCreateShaderModule(app->logicalDevice, &rchitShaderModuleCreateInfo, NULL, &rchitShaderModule)) == VK_SUCCESS) {
     printf("\033[22;32m%s\033[0m\n", "created rchit shader module");
   }
  
@@ -1427,7 +1453,7 @@ void createRayTracePipeline(struct VulkanApplication* app) {
   pipelineLayoutCreateInfo.pSetLayouts = app->rayTraceDescriptorSetLayouts;
   pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 
-  if (vkCreatePipelineLayout(app->logicalDevice, &pipelineLayoutCreateInfo, NULL, &app->rayTracePipelineLayout) == VK_SUCCESS) {
+  if (check("vkCreatePipelineLayout", vkCreatePipelineLayout(app->logicalDevice, &pipelineLayoutCreateInfo, NULL, &app->rayTracePipelineLayout)) == VK_SUCCESS) {
     printf("created ray trace pipline layout\n");
   }
 
@@ -1452,7 +1478,7 @@ void createRayTracePipeline(struct VulkanApplication* app) {
   rayPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
   rayPipelineCreateInfo.basePipelineIndex = -1;
 
-  if (pvkCreateRayTracingPipelinesKHR(app->logicalDevice, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayPipelineCreateInfo, NULL, &app->rayTracePipeline) == VK_SUCCESS) {
+  if (check("pvkCreateRayTracingPipelinesKHR", pvkCreateRayTracingPipelinesKHR(app->logicalDevice, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayPipelineCreateInfo, NULL, &app->rayTracePipeline)) == VK_SUCCESS) {
     printf("created ray trace pipeline\n");
   }
 
@@ -1485,12 +1511,12 @@ void createShaderBindingTable(struct VulkanApplication* app) {
   createBuffer(app, shaderBindingTableSize, VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &app->shaderBindingTableBuffer, &app->shaderBindingTableBufferMemory);
 
   void* shaderHandleStorage = (void*)malloc(sizeof(uint8_t) * shaderBindingTableSize);
-  if (pvkGetRayTracingShaderGroupHandlesKHR(app->logicalDevice, app->rayTracePipeline, 0, 4, shaderBindingTableSize, shaderHandleStorage) == VK_SUCCESS) {
+  if (check("pvkGetRayTracingShaderGroupHandlesKHR", pvkGetRayTracingShaderGroupHandlesKHR(app->logicalDevice, app->rayTracePipeline, 0, 4, shaderBindingTableSize, shaderHandleStorage)) == VK_SUCCESS) {
     printf("got ray tracing shader group handles\n");
   }
 
   void* data;
-  vkMapMemory(app->logicalDevice, app->shaderBindingTableBufferMemory, 0, shaderBindingTableSize, 0, &data);
+  check("vkMapMemory", vkMapMemory(app->logicalDevice, app->shaderBindingTableBufferMemory, 0, shaderBindingTableSize, 0, &data));
   for (int x = 0; x < 4; x++) {
     memcpy(data, (uint8_t*)shaderHandleStorage + x * rayTracingProperties.shaderGroupHandleSize, rayTracingProperties.shaderGroupHandleSize);
     data += rayTracingProperties.shaderGroupBaseAlignment;
@@ -1521,7 +1547,7 @@ void createCommandBuffers(struct VulkanApplication* app) {
   commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   commandBufferAllocateInfo.commandBufferCount = app->imageCount;
 
-  if (vkAllocateCommandBuffers(app->logicalDevice, &commandBufferAllocateInfo, app->commandBuffers) == VK_SUCCESS) {
+  if (check("vkAllocateCommandBuffers", vkAllocateCommandBuffers(app->logicalDevice, &commandBufferAllocateInfo, app->commandBuffers)) == VK_SUCCESS) {
     printf("\033[22;32m%s\033[0m\n", "allocated command buffers");
   }
 
@@ -1568,7 +1594,7 @@ void createCommandBuffers(struct VulkanApplication* app) {
     subresourceRange.baseArrayLayer = 0;
     subresourceRange.layerCount = 1;
 
-    if (vkBeginCommandBuffer(app->commandBuffers[x], &commandBufferBeginCreateInfo) == VK_SUCCESS) {
+    if (check("vkBeginCommandBuffer", vkBeginCommandBuffer(app->commandBuffers[x], &commandBufferBeginCreateInfo)) == VK_SUCCESS) {
       printf("\033[22;32m%s%d\033[0m\n", "began recording command buffer for image #", x);
     }
       
@@ -1675,7 +1701,7 @@ void createCommandBuffers(struct VulkanApplication* app) {
       vkCmdPipelineBarrier(app->commandBuffers[x], VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1, &imageMemoryBarrier);
     }
 
-    if (vkEndCommandBuffer(app->commandBuffers[x]) == VK_SUCCESS) {
+    if (check("vkEndCommandBuffer", vkEndCommandBuffer(app->commandBuffers[x])) == VK_SUCCESS) {
       printf("\033[22;32m%s%d\033[0m\n", "ended recording command buffer for image #", x);
     }
   }
@@ -1698,9 +1724,9 @@ void createSynchronizationObjects(struct VulkanApplication* app) {
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
   for (int x = 0; x < MAX_FRAMES_IN_FLIGHT; x++) {
-    if (vkCreateSemaphore(app->logicalDevice, &semaphoreCreateInfo, NULL, &app->imageAvailableSemaphores[x]) == VK_SUCCESS &&
-        vkCreateSemaphore(app->logicalDevice, &semaphoreCreateInfo, NULL, &app->renderFinishedSemaphores[x]) == VK_SUCCESS &&
-        vkCreateFence(app->logicalDevice, &fenceCreateInfo, NULL, &app->inFlightFences[x]) == VK_SUCCESS) {
+    if (check("vkCreateSemaphore", vkCreateSemaphore(app->logicalDevice, &semaphoreCreateInfo, NULL, &app->imageAvailableSemaphores[x])) == VK_SUCCESS &&
+        check("vkCreateSemaphore", vkCreateSemaphore(app->logicalDevice, &semaphoreCreateInfo, NULL, &app->renderFinishedSemaphores[x])) == VK_SUCCESS &&
+        check("vkCreateSemaphore", vkCreateFence(app->logicalDevice, &fenceCreateInfo, NULL, &app->inFlightFences[x])) == VK_SUCCESS) {
       printf("created synchronization objects for frame #%d\n", x);
     }
   }
@@ -1714,13 +1740,13 @@ void updateUniformBuffer(struct VulkanApplication* app, struct Camera* camera) {
 }
 
 void drawFrame(struct VulkanApplication* app, struct Camera* camera) {
-  vkWaitForFences(app->logicalDevice, 1, &app->inFlightFences[app->currentFrame], VK_TRUE, UINT64_MAX);
+  check("vkWaitForFences", vkWaitForFences(app->logicalDevice, 1, &app->inFlightFences[app->currentFrame], VK_TRUE, UINT64_MAX));
     
   uint32_t imageIndex;
-  vkAcquireNextImageKHR(app->logicalDevice, app->swapchain, UINT64_MAX, app->imageAvailableSemaphores[app->currentFrame], VK_NULL_HANDLE, &imageIndex);
+  check("vkAquireNextImageKHR", vkAcquireNextImageKHR(app->logicalDevice, app->swapchain, UINT64_MAX, app->imageAvailableSemaphores[app->currentFrame], VK_NULL_HANDLE, &imageIndex));
     
   if (app->imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
-    vkWaitForFences(app->logicalDevice, 1, &app->imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+    check("vkWaitForFences", vkWaitForFences(app->logicalDevice, 1, &app->imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX));
   }
   app->imagesInFlight[imageIndex] = app->inFlightFences[app->currentFrame];
  
@@ -1744,7 +1770,7 @@ void drawFrame(struct VulkanApplication* app, struct Camera* camera) {
 
   vkResetFences(app->logicalDevice, 1, &app->inFlightFences[app->currentFrame]);
 
-  if (vkQueueSubmit(app->graphicsQueue, 1, &submitInfo, app->inFlightFences[app->currentFrame]) != VK_SUCCESS) {
+  if (check("vkQueueSubmit", vkQueueSubmit(app->graphicsQueue, 1, &submitInfo, app->inFlightFences[app->currentFrame])) != VK_SUCCESS) {
     printf("failed to submit draw command buffer\n");
   }
 
@@ -1836,7 +1862,7 @@ void runMainLoop(struct VulkanApplication* app, struct Camera* camera) {
     drawFrame(app, camera);
   }
 
-  vkDeviceWaitIdle(app->logicalDevice);
+  check("vkDeviceWaitIdle", vkDeviceWaitIdle(app->logicalDevice));
 }
 
 void cleanUp(struct VulkanApplication* app, struct Scene* scene) {
@@ -1938,6 +1964,10 @@ int main(void) {
   };
 
   initializeScene(scene, "res/cube_scene.obj");
+  // initializeScene(scene, "res/cube_scene_pile.obj");
+  // initializeScene(scene, "res/cube_scene_large_pile.obj");
+  // initializeScene(scene, "res/cube_scene_larger_pile.obj");
+  // initializeScene(scene, "res/barrel.obj");
 
   initializeVulkanContext(app);
   pickPhysicalDevice(app);

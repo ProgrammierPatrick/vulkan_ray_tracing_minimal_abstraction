@@ -9,8 +9,8 @@ OBJS := $(notdir $(SRCS:%.c=%.o))
 SHADER_SRCS := $(wildcard src/shaders/*)
 SHADER_OBJS := $(notdir $(SHADER_SRCS:%=%.spv))
 
-CFLAGS =-I$(VULKAN_SDK_PATH)/include -I$(GLFW_PATH)/include
-LDFLAGS =-L$(VULKAN_SDK_PATH)/lib -L$(GLFW_PATH)/build/src -lGL -lglfw3 -lX11 -lXrandr -lpthread -ldl -lm -lvulkan
+CFLAGS =-I$(VULKAN_SDK_PATH)/include -I$(GLFW_PATH)/include -g -Wall
+LDFLAGS =-L$(VULKAN_SDK_PATH)/lib -L$(GLFW_PATH)/build/src -lGL -lglfw -lX11 -lXrandr -lpthread -ldl -lm -lvulkan
 
 $EXEC: $(OBJS) $(SHADER_OBJS)
 	gcc $(CFLAGS) -o bin/$(EXEC) build/*.o $(LDFLAGS)
