@@ -166,6 +166,7 @@ VkResult check(const char* funcName, VkResult result) {
     else if(result == VK_ERROR_FEATURE_NOT_PRESENT) error = "VK_ERROR_FEATURE_NOT_PRESENT";
     else if(result == VK_ERROR_TOO_MANY_OBJECTS) error = "VK_ERROR_TOO_MANY_OBJECTS";
     printf("\033[91m=============\nVulkan function %s() failed: %s\n=============\033[0m\n", funcName, error);
+    exit(-1);
   }
   return result;
 }
@@ -761,7 +762,7 @@ void createBottomLevelAccelerationStructure(struct VulkanApplication* app, struc
     .vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
     .vertexData = vertexDeviceOrHostAddressConst,
     .vertexStride = sizeof(float) * 3,
-    .maxVertex = scene->attributes.num_vertices,
+    .maxVertex = scene->attributes.num_vertices - 1, // THIS IS FROM Q2RTX repo ()
     .indexType = VK_INDEX_TYPE_UINT32,
     .indexData = indexDeviceOrHostAddressConst,
     .transformData = (VkDeviceOrHostAddressConstKHR){}
@@ -802,10 +803,19 @@ void createBottomLevelAccelerationStructure(struct VulkanApplication* app, struc
     .buildScratchSize = 0
   };
 
+#ifndef max
+#define max(A,B) ((A) >= (B) ? (A) : (B))
+#endif
+
+  // from Q2RTX: max_primitive_count as max from num_verts and num_indices
+  // https://github.com/NVIDIA/Q2RTX/blob/514b136acacd217a003bcb3815f32416028ea591/src/refresh/vkpt/path_tracer.c#L495
+  // uint32_t max_primitive_count = max(scene->attributes.num_vertices, scene->attributes.num_face_num_verts * 3) / 3;
+  uint32_t max_primitive_count = scene->attributes.num_face_num_verts;
+
   pvkGetAccelerationStructureBuildSizesKHR(app->logicalDevice, 
                                            VK_ACCELERATION_STRUCTURE_BUILD_TYPE_HOST_KHR, 
                                            &accelerationStructureBuildGeometryInfo, 
-                                           &accelerationStructureBuildGeometryInfo.geometryCount, 
+                                           &max_primitive_count,
                                            &accelerationStructureBuildSizesInfo);
 
   createBuffer(app, accelerationStructureBuildSizesInfo.accelerationStructureSize,  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &app->bottomLevelAccelerationStructureBuffer, &app->bottomLevelAccelerationStructureBufferMemory);
@@ -1963,10 +1973,10 @@ int main(void) {
     .frameCount = 0,
   };
 
-  initializeScene(scene, "res/cube_scene.obj");
+  // initializeScene(scene, "res/cube_scene.obj");
   // initializeScene(scene, "res/cube_scene_pile.obj");
   // initializeScene(scene, "res/cube_scene_large_pile.obj");
-  // initializeScene(scene, "res/cube_scene_larger_pile.obj");
+  initializeScene(scene, "res/cube_scene_larger_pile.obj");
   // initializeScene(scene, "res/barrel.obj");
 
   initializeVulkanContext(app);
